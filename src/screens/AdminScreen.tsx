@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ArrowLeft, Search, Bell, Menu, X, Users, Coins, Database, Palette,
   Shield, Flag, UserPlus, AlertTriangle, TrendingUp, Settings,
@@ -6,6 +6,11 @@ import {
   Smile, FileText, Mail, Calendar, HeartHandshake, ShoppingBag, Wallet,
   Volume2, Wrench, Key, BarChart3, ChevronRight, Check, Power,
   Trash2, Edit3, Ban, Plus, Save, Eye, EyeOff, Lock, BadgeCheck,
+  UserCircle, UserCheck, Layers, ArrowLeftRight, CreditCard, Ticket,
+  Receipt, Fingerprint, ScanFace, FileWarning, Lock as LockIcon, Gauge,
+  Activity, Server, Cloud, Download, FlaskConical, Webhook,
+  Smartphone, Share2, Languages, Brush, Building2, FileCheck,
+  Home, Archive,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -13,41 +18,94 @@ import type { Profile, Post, ShopItem, Ad, Report } from '@/types';
 
 type AdminView =
   | 'dashboard' | 'users' | 'coins' | 'storage' | 'whitelabel' | 'assistants'
-  | 'reports' | 'signups' | 'flagged' | 'earnings'
+  | 'reports' | 'signups' | 'flagged' | 'earnings' | 'fraudtrend'
   | 'live' | 'games' | 'ads' | 'audio' | 'stories' | 'reels'
   | 'dating' | 'confessions' | 'mood' | 'posts' | 'messages' | 'friends'
   | 'swipe' | 'blinddate' | 'shop' | 'payouts' | 'announcements'
-  | 'maintenance' | 'backup' | 'apikeys' | 'analytics';
+  | 'maintenance' | 'backup' | 'apikeys' | 'analytics'
+  | 'userprofiles' | 'followers' | 'groups' | 'events'
+  | 'cointransactions' | 'p2pmarket' | 'listings' | 'subscriptionplans'
+  | 'subscriptions' | 'promocodes' | 'revenuereports'
+  | 'banmanagement' | 'iptracking' | 'frauddetection' | 'kyc'
+  | 'auditlogs' | 'securitypolicies' | 'ratelimiting' | 'roles'
+  | 'systemhealth' | 'dbmetrics' | 'cdn' | 'dataexport'
+  | 'featureflags' | 'abtesting' | 'webhooks'
+  | 'pushnotifications' | 'notifications' | 'referrals'
+  | 'seo' | 'localization' | 'theming'
+  | 'emailservice' | 'smsgateway' | 'gdpr' | 'taxcompliance';
 
 const MENU_ITEMS: { key: AdminView; label: string; icon: React.ReactNode; group: string }[] = [
-  { key: 'users', label: 'User Management', icon: <Users size={16} />, group: 'Core' },
-  { key: 'posts', label: 'Posts & Comments', icon: <FileText size={16} />, group: 'Core' },
-  { key: 'messages', label: 'Messages', icon: <Mail size={16} />, group: 'Core' },
-  { key: 'reports', label: 'Reports', icon: <Flag size={16} />, group: 'Core' },
-  { key: 'assistants', label: 'Admin Delegation', icon: <Shield size={16} />, group: 'Core' },
-  { key: 'shop', label: 'Top Shop', icon: <ShoppingBag size={16} />, group: 'Commerce' },
-  { key: 'ads', label: 'Ads Manager', icon: <Megaphone size={16} />, group: 'Commerce' },
-  { key: 'coins', label: 'Coin Economics', icon: <Coins size={16} />, group: 'Commerce' },
-  { key: 'payouts', label: 'Wallet & Payouts', icon: <Wallet size={16} />, group: 'Commerce' },
-  { key: 'live', label: 'Live Streams', icon: <Radio size={16} />, group: 'Content' },
-  { key: 'games', label: 'Gaming Controls', icon: <Gamepad2 size={16} />, group: 'Content' },
-  { key: 'audio', label: 'Music / Audio', icon: <Headphones size={16} />, group: 'Content' },
-  { key: 'stories', label: 'Hot Stories', icon: <Film size={16} />, group: 'Content' },
-  { key: 'reels', label: 'Reels', icon: <Film size={16} />, group: 'Content' },
-  { key: 'dating', label: 'Dating Rooms', icon: <Heart size={16} />, group: 'Social' },
-  { key: 'confessions', label: 'Confessions', icon: <MessageSquare size={16} />, group: 'Social' },
-  { key: 'mood', label: 'Mood & Vibe', icon: <Smile size={16} />, group: 'Social' },
-  { key: 'friends', label: 'Friends / Events', icon: <Calendar size={16} />, group: 'Social' },
-  { key: 'swipe', label: 'Swipe / Match', icon: <HeartHandshake size={16} />, group: 'Social' },
-  { key: 'blinddate', label: 'Blind Date', icon: <HeartHandshake size={16} />, group: 'Social' },
-  { key: 'announcements', label: 'System Announcements', icon: <Volume2 size={16} />, group: 'System' },
-  { key: 'maintenance', label: 'Maintenance Toggle', icon: <Power size={16} />, group: 'System' },
-  { key: 'backup', label: 'Backup / Restore', icon: <Wrench size={16} />, group: 'System' },
-  { key: 'apikeys', label: 'API Keys Manager', icon: <Key size={16} />, group: 'System' },
-  { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={16} />, group: 'System' },
+  // --- Core Flip Modules (25) ---
+  { key: 'users', label: 'User Management', icon: <Users size={16} />, group: 'Users & Community' },
+  { key: 'userprofiles', label: 'User Profiles', icon: <UserCircle size={16} />, group: 'Users & Community' },
+  { key: 'followers', label: 'Followers Graph', icon: <UserCheck size={16} />, group: 'Users & Community' },
+  { key: 'groups', label: 'Groups & Communities', icon: <Users size={16} />, group: 'Users & Community' },
+  { key: 'events', label: 'Events Calendar', icon: <Calendar size={16} />, group: 'Users & Community' },
+  { key: 'messages', label: 'Direct Messages', icon: <Mail size={16} />, group: 'Users & Community' },
+  { key: 'dating', label: 'Dating', icon: <Heart size={16} />, group: 'Users & Community' },
+  { key: 'swipe', label: 'Swipe / Match', icon: <HeartHandshake size={16} />, group: 'Users & Community' },
+  { key: 'blinddate', label: 'Blind Date', icon: <HeartHandshake size={16} />, group: 'Users & Community' },
+  { key: 'posts', label: 'Posts & Comments', icon: <FileText size={16} />, group: 'Content & Media' },
+  { key: 'reels', label: 'Reels', icon: <Film size={16} />, group: 'Content & Media' },
+  { key: 'stories', label: 'Stories', icon: <Film size={16} />, group: 'Content & Media' },
+  { key: 'live', label: 'Live Streaming', icon: <Radio size={16} />, group: 'Content & Media' },
+  { key: 'audio', label: 'Audio Lounge', icon: <Headphones size={16} />, group: 'Content & Media' },
+  { key: 'confessions', label: 'Confessions', icon: <MessageSquare size={16} />, group: 'Content & Media' },
+  { key: 'mood', label: 'Mood & Vibe', icon: <Smile size={16} />, group: 'Content & Media' },
+  { key: 'reports', label: 'Reports & Moderation', icon: <Flag size={16} />, group: 'Content & Media' },
+  { key: 'flagged', label: 'Flagged Content', icon: <AlertTriangle size={16} />, group: 'Content & Media' },
+  { key: 'coins', label: 'Coin Economy', icon: <Coins size={16} />, group: 'Economy & Marketplace' },
+  { key: 'cointransactions', label: 'Coin Transactions', icon: <ArrowLeftRight size={16} />, group: 'Economy & Marketplace' },
+  { key: 'p2pmarket', label: 'P2P Marketplace', icon: <ShoppingBag size={16} />, group: 'Economy & Marketplace' },
+  { key: 'shop', label: 'TopShop', icon: <ShoppingBag size={16} />, group: 'Economy & Marketplace' },
+  { key: 'games', label: 'Mini-Games', icon: <Gamepad2 size={16} />, group: 'Economy & Marketplace' },
+  { key: 'payouts', label: 'Wallet Tracker', icon: <Wallet size={16} />, group: 'Economy & Marketplace' },
+  { key: 'ads', label: 'Ads', icon: <Megaphone size={16} />, group: 'Economy & Marketplace' },
+  // --- Additional Professional Modules (35) ---
+  { key: 'listings', label: 'Marketplace Listings', icon: <Layers size={16} />, group: 'Economy & Marketplace' },
+  { key: 'subscriptions', label: 'Subscriptions', icon: <CreditCard size={16} />, group: 'Economy & Marketplace' },
+  { key: 'banmanagement', label: 'Ban Management', icon: <Ban size={16} />, group: 'Moderation & Security' },
+  { key: 'iptracking', label: 'IP & Device Tracking', icon: <Fingerprint size={16} />, group: 'Moderation & Security' },
+  { key: 'frauddetection', label: 'Fraud Detection', icon: <ScanFace size={16} />, group: 'Moderation & Security' },
+  { key: 'kyc', label: 'KYC Verification', icon: <FileCheck size={16} />, group: 'Moderation & Security' },
+  { key: 'auditlogs', label: 'Audit Logs', icon: <FileText size={16} />, group: 'Moderation & Security' },
+  { key: 'securitypolicies', label: 'Security Policies', icon: <LockIcon size={16} />, group: 'Moderation & Security' },
+  { key: 'ratelimiting', label: 'Rate Limiting', icon: <Gauge size={16} />, group: 'Moderation & Security' },
+  { key: 'roles', label: 'Role & Permissions', icon: <Shield size={16} />, group: 'Moderation & Security' },
+  { key: 'assistants', label: 'Admin Assistant', icon: <Shield size={16} />, group: 'Moderation & Security' },
+  { key: 'systemhealth', label: 'System Health', icon: <Activity size={16} />, group: 'System & Infrastructure' },
+  { key: 'dbmetrics', label: 'Database Metrics', icon: <Database size={16} />, group: 'System & Infrastructure' },
+  { key: 'storage', label: 'Storage Management', icon: <Database size={16} />, group: 'System & Infrastructure' },
+  { key: 'cdn', label: 'CDN Management', icon: <Cloud size={16} />, group: 'System & Infrastructure' },
+  { key: 'backup', label: 'Backup & Restore', icon: <Archive size={16} />, group: 'System & Infrastructure' },
+  { key: 'dataexport', label: 'Data Export', icon: <Download size={16} />, group: 'System & Infrastructure' },
+  { key: 'maintenance', label: 'Maintenance Mode', icon: <Power size={16} />, group: 'System & Infrastructure' },
+  { key: 'featureflags', label: 'Feature Flags', icon: <FlaskConical size={16} />, group: 'System & Infrastructure' },
+  { key: 'abtesting', label: 'A/B Testing', icon: <FlaskConical size={16} />, group: 'System & Infrastructure' },
+  { key: 'apikeys', label: 'API Keys', icon: <Key size={16} />, group: 'System & Infrastructure' },
+  { key: 'webhooks', label: 'Webhooks', icon: <Webhook size={16} />, group: 'System & Infrastructure' },
+  { key: 'whitelabel', label: 'White Label Config', icon: <Building2 size={16} />, group: 'System & Infrastructure' },
+  { key: 'pushnotifications', label: 'Push Notifications', icon: <Smartphone size={16} />, group: 'Marketing & Growth' },
+  { key: 'notifications', label: 'In-App Notifications', icon: <Bell size={16} />, group: 'Marketing & Growth' },
+  { key: 'announcements', label: 'Announcements', icon: <Volume2 size={16} />, group: 'Marketing & Growth' },
+  { key: 'referrals', label: 'Referrals', icon: <Share2 size={16} />, group: 'Marketing & Growth' },
+  { key: 'analytics', label: 'Analytics Dashboard', icon: <BarChart3 size={16} />, group: 'Marketing & Growth' },
+  { key: 'seo', label: 'SEO Settings', icon: <Search size={16} />, group: 'Marketing & Growth' },
+  { key: 'localization', label: 'Localization', icon: <Languages size={16} />, group: 'Marketing & Growth' },
+  { key: 'theming', label: 'Theme & Branding', icon: <Brush size={16} />, group: 'Marketing & Growth' },
+  { key: 'emailservice', label: 'Email Service', icon: <Mail size={16} />, group: 'Compliance & Legal' },
+  { key: 'smsgateway', label: 'SMS Gateway', icon: <Smartphone size={16} />, group: 'Compliance & Legal' },
+  { key: 'gdpr', label: 'GDPR Requests', icon: <FileWarning size={16} />, group: 'Compliance & Legal' },
+  { key: 'taxcompliance', label: 'Tax & Compliance', icon: <FileCheck size={16} />, group: 'Compliance & Legal' },
 ];
 
-const MASTER_PASSWORD = '1234,.,Kilimanjaro.ffm';
+const MASTER_PASSWORD = '1234,.,@kilimanjaro.Ffm';
+
+const AUTHORIZED_ADMIN_EMAILS = [
+  'fransiscomanongi@gmail.com',
+  'ff7739537@gmail.com',
+  'adamufrank55@gmail.com',
+];
 
 export default function AdminScreen({ onBack }: { onBack: () => void }) {
   const { profile } = useAuth();
@@ -92,7 +150,25 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
     })();
   }, []);
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'moderator';
+  const isAdmin =
+    (profile?.role === 'admin' || profile?.role === 'moderator') &&
+    AUTHORIZED_ADMIN_EMAILS.includes(profile?.email?.toLowerCase() ?? '');
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredMenuItems = useMemo(() => {
+    if (!searchQuery.trim()) return MENU_ITEMS;
+    return MENU_ITEMS.filter((item) =>
+      item.label.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery]);
+
+  const groupedMenu = useMemo(() => {
+    return filteredMenuItems.reduce((acc, item) => {
+      (acc[item.group] = acc[item.group] || []).push(item);
+      return acc;
+    }, {} as Record<string, typeof MENU_ITEMS>);
+  }, [filteredMenuItems]);
 
   if (!isAdmin) {
     return (
@@ -145,85 +221,133 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
     );
   }
 
+  const renderView = () => {
+    if (view === 'dashboard') return <DashboardView stats={stats} setView={setView} />;
+    if (view === 'users') return <UsersManager />;
+    if (view === 'posts') return <PostsManager />;
+    if (view === 'messages') return <MessagesManager />;
+    if (view === 'shop') return <ShopManager />;
+    if (view === 'ads') return <AdsManager />;
+    if (view === 'reports') return <ReportsManager />;
+    if (view === 'announcements') return <AnnouncementsView />;
+    if (view === 'maintenance') return <MaintenanceView />;
+    if (view === 'backup') return <BackupView />;
+    if (view === 'apikeys') return <ApiKeysView />;
+    if (view === 'analytics') return <AnalyticsView />;
+    if (view === 'whitelabel') return <WhiteLabelView />;
+    if (view === 'assistants') return <AssistantsView />;
+    if (view === 'coins') return <CoinsView />;
+    if (view === 'storage') return <StorageView />;
+    if (view === 'signups') return <SignupsView />;
+    if (view === 'flagged') return <ReportsManager />;
+    if (view === 'earnings') return <EarningsView />;
+    if (view === 'payouts') return <EarningsView />;
+    if (['live', 'games', 'audio', 'stories', 'reels', 'dating', 'confessions', 'mood', 'friends', 'swipe', 'blinddate'].includes(view))
+      return <GenericDataView view={view} />;
+    return <PlaceholderView view={view} />;
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-xl border-b border-amber-500/20">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-2 rounded-full hover:bg-white/10 transition-colors">
-              <ArrowLeft size={20} />
+            <button onClick={() => setMenuOpen(true)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+              <Menu size={20} />
             </button>
             <h1 className="text-lg font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
               FLIP ADMIN MASTER
             </h1>
           </div>
           <div className="flex items-center gap-1">
-            <button className="p-2 rounded-full hover:bg-white/10 transition-colors"><Search size={18} /></button>
+            <div className="relative hidden sm:block">
+              <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search modules..."
+                className="w-48 bg-slate-800 border border-white/10 rounded-full pl-8 pr-3 py-1.5 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
+              />
+            </div>
             <button className="p-2 rounded-full hover:bg-white/10 transition-colors relative">
               <Bell size={18} />
               {stats.reports > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}
             </button>
-            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
-              {menuOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
           </div>
         </div>
-
-        {menuOpen && (
-          <div className="absolute right-4 top-14 w-72 max-h-[70vh] overflow-y-auto bg-slate-800 border border-white/10 rounded-2xl shadow-2xl p-2 z-50">
-            {Object.entries(
-              MENU_ITEMS.reduce((acc, item) => {
-                (acc[item.group] = acc[item.group] || []).push(item);
-                return acc;
-              }, {} as Record<string, typeof MENU_ITEMS>)
-            ).map(([group, items]) => (
-              <div key={group} className="mb-2">
-                <p className="text-[10px] font-bold text-slate-500 uppercase px-3 py-1">{group}</p>
-                {items.map((item) => (
-                  <button
-                    key={item.key}
-                    onClick={() => { setView(item.key); setMenuOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-colors ${
-                      view === item.key ? 'bg-amber-500/20 text-amber-400' : 'hover:bg-white/5 text-slate-300'
-                    }`}
-                  >
-                    {item.icon}
-                    <span className="flex-1 text-left">{item.label}</span>
-                    <ChevronRight size={14} className="text-slate-600" />
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
       </header>
 
+      {/* Slide-out Drawer */}
+      {menuOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-40"
+            onClick={() => setMenuOpen(false)}
+          />
+          <aside className="fixed left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-slate-900 border-r border-white/10 z-50 overflow-y-auto animate-slide-in-left">
+            <div className="flex items-center justify-between px-4 h-14 border-b border-white/10 sticky top-0 bg-slate-900 z-10">
+              <span className="font-bold text-white text-sm">Modules ({MENU_ITEMS.length})</span>
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-3">
+              <div className="relative mb-3">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search modules..."
+                  className="w-full bg-slate-800 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
+                />
+              </div>
+              <nav className="space-y-4 pb-20">
+                {Object.entries(groupedMenu).map(([group, items]) => (
+                  <div key={group}>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase px-2 py-1">{group}</p>
+                    <div className="space-y-0.5">
+                      {items.map((item) => (
+                        <button
+                          key={item.key}
+                          onClick={() => { setView(item.key); setMenuOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors ${
+                            view === item.key ? 'bg-amber-500/20 text-amber-400' : 'hover:bg-white/5 text-slate-300'
+                          }`}
+                        >
+                          {item.icon}
+                          <span className="flex-1 text-left truncate">{item.label}</span>
+                          <ChevronRight size={14} className="text-slate-600" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {filteredMenuItems.length === 0 && (
+                  <p className="text-center text-slate-500 text-sm py-8">No modules found.</p>
+                )}
+              </nav>
+            </div>
+          </aside>
+        </>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-6 pb-24">
-        {view === 'dashboard' && <DashboardView stats={stats} setView={setView} />}
-        {view === 'users' && <UsersManager />}
-        {view === 'posts' && <PostsManager />}
-        {view === 'messages' && <MessagesManager />}
-        {view === 'shop' && <ShopManager />}
-        {view === 'ads' && <AdsManager />}
-        {view === 'reports' && <ReportsManager />}
-        {view === 'announcements' && <AnnouncementsView />}
-        {view === 'maintenance' && <MaintenanceView />}
-        {view === 'backup' && <BackupView />}
-        {view === 'apikeys' && <ApiKeysView />}
-        {view === 'analytics' && <AnalyticsView />}
-        {view === 'whitelabel' && <WhiteLabelView />}
-        {view === 'assistants' && <AssistantsView />}
-        {view === 'coins' && <CoinsView />}
-        {view === 'storage' && <StorageView />}
-        {view === 'signups' && <SignupsView />}
-        {view === 'flagged' && <ReportsManager />}
-        {view === 'earnings' && <EarningsView />}
-        {view === 'payouts' && <EarningsView />}
-        {[
-          'live', 'games', 'audio', 'stories', 'reels',
-          'dating', 'confessions', 'mood', 'friends', 'swipe', 'blinddate',
-        ].includes(view) && <GenericDataView view={view} />}
+        {renderView()}
       </div>
+
+      {/* Home button at base */}
+      <button
+        onClick={onBack}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-full shadow-lg shadow-amber-500/30 hover:from-amber-400 hover:to-orange-400 transition-all"
+      >
+        <Home size={18} />
+        Home
+      </button>
     </div>
   );
 }
@@ -241,14 +365,15 @@ interface AdminStats {
 function DashboardView({ stats, setView }: { stats: AdminStats; setView: (v: AdminView) => void }) {
   const cards = [
     { key: 'users' as AdminView, label: 'Users', value: stats.userCount, icon: <Users size={24} />, color: 'emerald', desc: 'Total registered users' },
-    { key: 'coins' as AdminView, label: 'Coin Balance', value: stats.coinPool.toLocaleString(), icon: <Coins size={24} />, color: 'amber', desc: 'System circulation pool' },
-    { key: 'storage' as AdminView, label: 'Storage & Resources', value: `${stats.storageUsed}%`, icon: <Database size={24} />, color: 'cyan', desc: 'Storage usage tracking' },
+    { key: 'coins' as AdminView, label: 'Coin', value: stats.coinPool.toLocaleString(), icon: <Coins size={24} />, color: 'amber', desc: 'System circulation pool' },
+    { key: 'storage' as AdminView, label: 'Storage', value: `${stats.storageUsed}%`, icon: <Database size={24} />, color: 'cyan', desc: 'Storage usage tracking' },
+    { key: 'whitelabel' as AdminView, label: 'White Label / System Status', value: 'Operational', icon: <Palette size={24} />, color: 'violet', desc: 'All systems running' },
+    { key: 'assistants' as AdminView, label: 'Admin Assistant', value: 'Active', icon: <Shield size={24} />, color: 'rose', desc: 'Delegation & sub-admins' },
     { key: 'reports' as AdminView, label: 'Active Reports', value: stats.reports, icon: <Flag size={24} />, color: 'red', desc: 'Pending report tickets' },
-    { key: 'signups' as AdminView, label: 'New Signups Today', value: stats.signupsToday, icon: <UserPlus size={24} />, color: 'teal', desc: 'Users joined today' },
+    { key: 'signups' as AdminView, label: 'New Signups', value: stats.signupsToday, icon: <UserPlus size={24} />, color: 'teal', desc: 'Users joined today' },
     { key: 'flagged' as AdminView, label: 'Flagged Content', value: stats.flagged, icon: <AlertTriangle size={24} />, color: 'orange', desc: 'Flagged items' },
-    { key: 'earnings' as AdminView, label: 'Earnings / Volume', value: stats.earnings.toLocaleString(), icon: <TrendingUp size={24} />, color: 'emerald', desc: 'Transaction volume today' },
-    { key: 'ads' as AdminView, label: 'Ads Manager', value: '3 Types', icon: <Megaphone size={24} />, color: 'rose', desc: 'Google, Sponsored, Admin' },
-    { key: 'shop' as AdminView, label: 'Top Shop', value: 'Manage', icon: <ShoppingBag size={24} />, color: 'cyan', desc: 'Inventory & pricing' },
+    { key: 'fraudtrend' as AdminView, label: 'Earning / Fraud Trend', value: '0.3%', icon: <TrendingUp size={24} />, color: 'indigo', desc: 'Below threshold' },
+    { key: 'earnings' as AdminView, label: 'Earnings Transaction Volume', value: stats.earnings.toLocaleString(), icon: <BarChart3 size={24} />, color: 'emerald', desc: 'Transaction volume today' },
   ];
 
   return (
@@ -1485,6 +1610,49 @@ function AnnouncementsView() {
             <p className="text-xs text-slate-400 mt-1">{a.body as string}</p>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderView({ view }: { view: string }) {
+  const labelMap: Record<string, string> = {
+    userprofiles: 'User Profiles', followers: 'Followers Graph', groups: 'Groups & Communities',
+    events: 'Events Calendar', cointransactions: 'Coin Transactions', p2pmarket: 'P2P Marketplace',
+    listings: 'Marketplace Listings', subscriptions: 'Subscriptions',
+    banmanagement: 'Ban Management', iptracking: 'IP & Device Tracking',
+    frauddetection: 'Fraud Detection', kyc: 'KYC Verification', auditlogs: 'Audit Logs',
+    securitypolicies: 'Security Policies', ratelimiting: 'Rate Limiting',
+    roles: 'Role & Permissions', systemhealth: 'System Health', dbmetrics: 'Database Metrics',
+    cdn: 'CDN Management', dataexport: 'Data Export', featureflags: 'Feature Flags',
+    abtesting: 'A/B Testing', webhooks: 'Webhooks', whitelabel: 'White Label Config',
+    pushnotifications: 'Push Notifications', notifications: 'In-App Notifications',
+    referrals: 'Referrals', seo: 'SEO Settings', localization: 'Localization',
+    theming: 'Theme & Branding', emailservice: 'Email Service', smsgateway: 'SMS Gateway',
+    gdpr: 'GDPR Requests', taxcompliance: 'Tax & Compliance', fraudtrend: 'Earning / Fraud Trend',
+  };
+  const title = labelMap[view] || view;
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold mb-4">{title}</h2>
+      <div className="bg-slate-900 rounded-2xl border border-white/5 p-8 sm:p-12">
+        <div className="flex flex-col items-center text-center py-8">
+          <div className="w-16 h-16 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center mb-4">
+            <Wrench className="text-slate-600" size={28} />
+          </div>
+          <p className="text-slate-400 max-w-md leading-relaxed text-sm">
+            This module is structured and ready for feature hookup. Connect your data sources and business logic here.
+          </p>
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-lg">
+            {['Metrics', 'Data Table', 'Settings', 'Filters', 'Export', 'Audit Log'].map((l) => (
+              <div key={l} className="bg-slate-800/50 border border-white/5 rounded-lg p-3 text-center">
+                <p className="text-xs text-slate-500">{l}</p>
+                <p className="text-base font-bold text-slate-600 mt-1">&mdash;</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

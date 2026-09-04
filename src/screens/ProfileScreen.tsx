@@ -114,7 +114,14 @@ export default function ProfileScreen({ onBack, onOpenAdmin }: { onBack: () => v
 
   if (!profile) return null;
 
-  const isAdmin = profile.role === 'admin' || profile.role === 'moderator';
+  const AUTHORIZED_ADMIN_EMAILS = [
+    'fransiscomanongi@gmail.com',
+    'ff7739537@gmail.com',
+    'adamufrank55@gmail.com',
+  ];
+  const isAdmin =
+    (profile.role === 'admin' || profile.role === 'moderator') &&
+    AUTHORIZED_ADMIN_EMAILS.includes(profile.email?.toLowerCase() ?? '');
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
