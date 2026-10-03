@@ -10,12 +10,17 @@ interface LocalUser {
   profile: Profile;
 }
 
-const ADMIN_EMAILS = [
+export const ADMIN_EMAILS = [
   'adamufrank55@gmail.com',
   'ff7739537@gmail.com',
   'ff7739537-glitch@gmail.com',
   'fransiscomanongi@gmail.com',
 ];
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase().trim());
+}
 
 function generateId(): string {
   return 'local-' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);

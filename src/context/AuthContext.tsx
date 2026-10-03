@@ -10,6 +10,7 @@ import {
   rateLimit,
   sanitizeFreeText,
 } from '@/lib/security';
+import { isAdminEmail } from '@/lib/localAuth';
 
 // Lazy-load Firebase auth functions only when Firebase is configured
 // This prevents crashes when Firebase env vars are missing
@@ -83,8 +84,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (data) {
-        setProfile(data as Profile);
-        return data as Profile;
+        const profileData = data as Profile;
+        // Auto-elevate role if the email is a predefined admin email
+        if (isAdminEmail(profileData.email) && profileData.role !== 'admin') {
+          try {
+            await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId);
+            profileData.role = 'admin';
+          } catch {
+            // Non-fatal: profile still works with original role
+          }
+        }
+        setProfile(profileData);
+        return profileData;
       }
 
       if (retries < 4) {
@@ -109,8 +120,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
 
         if (created) {
-          setProfile(created as Profile);
-          return created as Profile;
+          const createdProfile = created as Profile;
+          if (isAdminEmail(createdProfile.email) && createdProfile.role !== 'admin') {
+            try {
+              await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId);
+              createdProfile.role = 'admin';
+            } catch {
+              // Non-fatal
+            }
+          }
+          setProfile(createdProfile);
+          return createdProfile;
         }
         if (insertError) {
           console.error('Profile creation failed:', insertError.message);

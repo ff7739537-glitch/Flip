@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Edit, Coins, Calendar, Settings, Shield, LogOut, Save, X, Camera, Bell, Bug, Ban, Trash2, BookOpen, Heart, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { isAdminEmail } from '@/lib/localAuth';
 import { NotificationToggles } from '@/components/NotificationCenter';
 import type { Post, Profile, Story, BlockedUser } from '@/types';
 import VerifiedBadge from '@/components/VerifiedBadge';
@@ -114,14 +115,9 @@ export default function ProfileScreen({ onBack, onOpenAdmin }: { onBack: () => v
 
   if (!profile) return null;
 
-  const AUTHORIZED_ADMIN_EMAILS = [
-    'fransiscomanongi@gmail.com',
-    'ff7739537@gmail.com',
-    'adamufrank55@gmail.com',
-  ];
   const isAdmin =
     (profile.role === 'admin' || profile.role === 'moderator') &&
-    AUTHORIZED_ADMIN_EMAILS.includes(profile.email?.toLowerCase() ?? '');
+    isAdminEmail(profile.email);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">

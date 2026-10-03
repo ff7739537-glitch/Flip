@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
@@ -31,12 +31,18 @@ import InstallPrompt from '@/components/InstallPrompt';
 type AppView = 'main' | 'profile' | 'admin';
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const [view, setView] = useState<AppView>('main');
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [activePill, setActivePill] = useState<PillTag | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingConversation, setPendingConversation] = useState<Conversation | null>(null);
+
+  useEffect(() => {
+    if (profile?.role === 'admin') {
+      setView('admin');
+    }
+  }, [profile?.role]);
 
   if (loading) {
     return (

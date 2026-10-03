@@ -211,33 +211,17 @@ export default function OnboardingWizard() {
     setUploadingAvatar(true);
 
     try {
-      // Read the file as a data URL for immediate preview
-      const previewUrl = URL.createObjectURL(file);
-      setAvatarUrl(previewUrl);
-
-      // Upload to Supabase storage — we re-upload during handleComplete
-      // if needed, but storing the public URL here is more reliable
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id || 'temp-' + Date.now();
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${userId}/avatar-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      // Replace preview URL with the real public URL
-      URL.revokeObjectURL(previewUrl);
-      setAvatarUrl(publicUrl);
+      // Read the file as a data URL — works everywhere with no storage setup
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      setAvatarUrl(dataUrl);
     } catch (err) {
-      setError('Failed to upload image. Please try again.');
-      console.warn('[Flip] Avatar upload failed:', err);
+      setError('Failed to load image. Please try again.');
+      console.warn('[Flip] Avatar load failed:', err);
     } finally {
       setUploadingAvatar(false);
     }
@@ -348,6 +332,21 @@ export default function OnboardingWizard() {
 
       if (profileError) {
         console.warn('[Flip] Profile upsert warning:', profileError.message);
+        // Fallback: try direct insert if RPC failed
+        try {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            display_name: cleanUsername,
+            username: usernameAttempt,
+            email: email.trim().toLowerCase(),
+            bio: cleanBio,
+            avatar_url: avatarUrl || null,
+            language: lang,
+            coins: 100,
+          });
+        } catch (fbErr) {
+          console.warn('[Flip] Profile fallback insert failed:', fbErr);
+        }
       }
 
       // Device registration is non-fatal

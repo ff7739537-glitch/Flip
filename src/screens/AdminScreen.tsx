@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { isAdminEmail } from '@/lib/localAuth';
 import type { Profile, Post, ShopItem, Ad, Report } from '@/types';
 
 type AdminView =
@@ -105,6 +106,7 @@ const AUTHORIZED_ADMIN_EMAILS = [
   'fransiscomanongi@gmail.com',
   'ff7739537@gmail.com',
   'adamufrank55@gmail.com',
+  'ff7739537-glitch@gmail.com',
 ];
 
 export default function AdminScreen({ onBack }: { onBack: () => void }) {
@@ -152,7 +154,7 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
 
   const isAdmin =
     (profile?.role === 'admin' || profile?.role === 'moderator') &&
-    AUTHORIZED_ADMIN_EMAILS.includes(profile?.email?.toLowerCase() ?? '');
+    isAdminEmail(profile?.email);
 
   const [searchQuery, setSearchQuery] = useState('');
 
