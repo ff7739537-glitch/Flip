@@ -19,9 +19,9 @@ export const isFirebaseConfigured = Boolean(
   firebaseConfig.messagingSenderId && firebaseConfig.appId
 );
 
-export type FirebaseApp = import('firebase/app').FirebaseApp;
-export type FirebaseAuth = import('firebase/auth').Auth;
-export type FirebaseDatabase = import('firebase/database').Database;
+export type FirebaseApp = { name: string; options: Record<string, unknown> } | null;
+export type FirebaseAuth = { app: FirebaseApp; currentUser: unknown | null } | null;
+export type FirebaseDatabase = { app: FirebaseApp } | null;
 
 let firebaseApp: FirebaseApp | null = null;
 let firebaseAuth: FirebaseAuth | null = null;
