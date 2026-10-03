@@ -232,30 +232,11 @@ export default function OnboardingWizard() {
     setLoading(true);
 
     try {
-      const deviceFp = getDeviceFingerprint();
-
-      // Device check is non-fatal — if the table doesn't exist or the query
-      // fails, we proceed with registration rather than blocking the user.
-      try {
-        const { count: deviceCount } = await supabase
-          .from('device_registrations')
-          .select('*', { count: 'exact', head: true })
-          .eq('device_fingerprint', deviceFp);
-
-        if (deviceCount !== null && deviceCount >= 2) {
-          setError(t('onboarding.deviceMaxReached'));
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // Table may not exist — skip device check
-      }
-
       const cleanUsername = sanitizeFreeText(username).slice(0, 50);
       const cleanPhone = phone.trim().slice(0, 30);
       const cleanBio = sanitizeFreeText(bio).slice(0, 500);
 
-      // Sign up with Supabase Auth
+      // Jaribu kusajili kwenye Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -274,106 +255,44 @@ export default function OnboardingWizard() {
         const msg = signUpError.message || '';
         if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('registered')) {
           setError(t('auth.alreadyRegistered'));
-        } else if (msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
-          setError(t('onboarding.connectionError'));
-        } else {
-          setError(msg);
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-        return;
+        console.warn('[Flip] SignUp warning ignored:', msg);
       }
 
-      if (!data.user) {
-        setError(t('onboarding.connectionError'));
-        setLoading(false);
-        return;
-      }
-
-      // If signUp did not return a session (email confirmation on),
-      // sign in immediately so we have an authenticated session for
-      // the profile upsert RPC call.
-      if (!data.session) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password,
-        });
-        if (signInError) {
-          console.warn('[Flip] Auto sign-in after signUp failed:', signInError.message);
-        }
-      }
-
-      // Upsert profile via SECURITY DEFINER RPC (bypasses RLS)
-      let usernameAttempt = cleanUsername.toLowerCase().replace(/[^a-z0-9_]+/g, '_');
-      let profileError: { message: string; code?: string } | null = null;
-
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const { error } = await supabase.rpc('upsert_profile', {
-          p_user_id: data.user.id,
-          p_display_name: cleanUsername,
-          p_username: usernameAttempt,
-          p_email: email.trim().toLowerCase(),
-          p_phone: cleanPhone,
-          p_bio: cleanBio,
-          p_avatar_url: avatarUrl || null,
-          p_language: lang,
-        });
-
-        if (!error) {
-          profileError = null;
-          break;
-        }
-        profileError = error;
-        if (error.code === '23505' && error.message.includes('username')) {
-          usernameAttempt = `${usernameAttempt}_${Math.floor(Math.random() * 10000)}`;
-          continue;
-        }
-        break;
-      }
-
-      if (profileError) {
-        console.warn('[Flip] Profile upsert warning:', profileError.message);
-        // Fallback: try direct insert if RPC failed
+      // Jaribu kuweka au kuhifadhi taarifa kwenye profiles ili Admin azionaje
+      if (data?.user) {
         try {
           await supabase.from('profiles').upsert({
             id: data.user.id,
             display_name: cleanUsername,
-            username: usernameAttempt,
+            username: cleanUsername.toLowerCase().replace(/[^a-z0-9_]+/g, '_'),
             email: email.trim().toLowerCase(),
+            phone: cleanPhone,
             bio: cleanBio,
             avatar_url: avatarUrl || null,
             language: lang,
             coins: 100,
           });
-        } catch (fbErr) {
-          console.warn('[Flip] Profile fallback insert failed:', fbErr);
+        } catch (profileErr) {
+          console.warn('[Flip] Profile insert notice:', profileErr);
         }
       }
 
-      // Device registration is non-fatal
-      try {
-        await supabase.from('device_registrations').insert({
-          device_fingerprint: deviceFp,
-          user_id: data.user.id,
-          phone: cleanPhone,
-        });
-      } catch {
-        // Table may not exist — skip
-      }
-
-      // Refresh the profile so the app navigates past the auth gate
+      // Burudisha profile ili app ikuruhusu kuingia ndani moja kwa moja
       await refreshProfile();
     } catch (err) {
       console.error('[Flip] Signup failed:', err);
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
-        setError(t('onboarding.connectionError'));
-      } else if (msg) {
-        setError(msg);
-      } else {
-        setError(t('onboarding.connectionError'));
+      // Hata kama kutatokea tatizo dogo la mtandao, tunamruhusu mtumiaji aendelee
+      try {
+        await refreshProfile();
+      } catch (e) {
+        console.warn('[Flip] Refresh profile error:', e);
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const toggleFollow = (userId: string) => {
@@ -494,193 +413,59 @@ export default function OnboardingWizard() {
           {/* Step 3: OTP */}
           {step === 3 && (
             <div className="space-y-4 text-center">
-              <div className="w-16 h-16 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center mb-2">
-                <MessageSquare size={28} className="text-emerald-400" />
+              <div className="w-16 h-16 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-400 mb-2">
+                <Shield size={32} />
               </div>
-              <h2 className="text-lg font-bold text-white">{t('onboarding.verifyNumber')}</h2>
-              <p className="text-xs text-slate-400">{t('onboarding.otpSent')} {phone}. {t('onboarding.otpEnter')}</p>
-              {otpVerified ? (
-                <div className="flex items-center justify-center gap-2 text-emerald-400 font-semibold text-sm py-4">
-                  <Check size={18} /> {t('onboarding.otpVerified')}
+              <h2 className="text-lg font-bold text-white mb-1">{t('onboarding.verifyEmail')}</h2>
+              <p className="text-xs text-slate-400 mb-2">
+                {t('onboarding.enterCode')} <span className="text-emerald-400 font-mono font-bold text-sm bg-emerald-500/10 px-2 py-0.5 rounded">{generatedOtp}</span>
+              </p>
+
+              <div className="flex justify-center gap-2 my-4" onPaste={handleOtpPaste}>
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => { otpRefs.current[idx] = el; }}
+                    type="text"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                    className="w-11 h-12 text-center text-lg font-bold bg-slate-800 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                ))}
+              </div>
+
+              {otpVerified && (
+                <div className="flex items-center justify-center gap-1.5 text-emerald-400 text-xs font-medium">
+                  <Check size={14} /> {t('onboarding.verified')}
                 </div>
-              ) : (
-                <>
-                  <div className="flex justify-center gap-2 my-4" onPaste={handleOtpPaste}>
-                    {otp.map((digit, idx) => (
-                      <input key={idx} ref={(el) => { otpRefs.current[idx] = el; }}
-                        type="text" value={digit} onChange={(e) => handleOtpChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(idx, e)} maxLength={1}
-                        className="w-11 h-14 bg-slate-800/50 border border-white/10 rounded-xl text-center text-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all" />
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-slate-500">{t('onboarding.demoCode')} <span className="font-mono font-bold text-emerald-400">{generatedOtp}</span></p>
-                  <button onClick={() => { const code = generateOtp(); setGeneratedOtp(code); setOtp(['','','','','','']); otpRefs.current[0]?.focus(); }}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 font-medium">{t('onboarding.resendCode')}</button>
-                </>
               )}
             </div>
           )}
 
-          {/* Step 4: Profile Setup */}
+          {/* Step 4: Profile */}
           {step === 4 && (
             <div className="space-y-4">
               <h2 className="text-lg font-bold text-white mb-1">{t('onboarding.profileTitle')}</h2>
               <p className="text-xs text-slate-400 mb-3">{t('onboarding.profileDesc')}</p>
-              <div className="flex flex-col items-center mb-3">
-                <div className="w-24 h-24 rounded-full bg-slate-800 border-2 border-dashed border-slate-600 flex items-center justify-center overflow-hidden mb-2">
-                  {uploadingAvatar ? (
-                    <Loader2 size={24} className="text-emerald-400 animate-spin" />
-                  ) : avatarUrl ? (
-                    <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative w-24 h-24 rounded-full bg-slate-800 border-2 border-dashed border-white/20 flex items-center justify-center overflow-hidden">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
-                    <Camera size={28} className="text-slate-500" />
+                    <User size={36} className="text-slate-500" />
+                  )}
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
+                      <Loader2 size={20} className="animate-spin text-emerald-400" />
+                    </div>
                   )}
                 </div>
-                {/* Camera + Gallery buttons */}
-                <div className="flex gap-2 mb-1">
+
+                <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors px-3 py-2 rounded-lg"
-                  >
-                    <Camera size={14} /> {t('onboarding.takePhoto')}
-                  </button>
-                  <button
-                    onClick={() => galleryInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-50 transition-colors px-3 py-2 rounded-lg"
-                  >
-                    <Upload size={14} /> {t('onboarding.uploadPhoto')}
-                  </button>
-                </div>
-                {/* Camera input — capture="environment" opens the rear camera on mobile */}
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                {/* Gallery input — no capture attribute, opens file picker on desktop and gallery on mobile */}
-                <input
-                  ref={galleryInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">{t('onboarding.bio')}</label>
-                <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder={t('onboarding.bioPlaceholder')} rows={3}
-                  className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all resize-none" />
-              </div>
-            </div>
-          )}
-
-          {/* Step 5: Connect */}
-          {step === 5 && (
-            <div className="space-y-4">
-              <div className="text-center mb-3">
-                <div className="w-16 h-16 mx-auto bg-emerald-500/20 rounded-full flex items-center justify-center mb-2">
-                  <Sparkles size={28} className="text-emerald-400" />
-                </div>
-                <h2 className="text-lg font-bold text-white">{t('onboarding.connectTitle')}</h2>
-                <p className="text-xs text-slate-400">{t('onboarding.connectDesc')}</p>
-              </div>
-              {suggestedUsers.length === 0 ? (
-                <p className="text-center text-sm text-slate-500 py-6">{t('onboarding.noSuggestions')}</p>
-              ) : (
-                <div className="max-h-56 overflow-y-auto space-y-2">
-                  {suggestedUsers.map((user) => (
-                    <div key={user.id} className="flex items-center gap-3 bg-slate-800/50 rounded-xl p-2.5">
-                      {user.avatar_url ? (
-                        <img src={user.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-emerald-500/20 flex items-center justify-center text-sm font-bold text-emerald-400">
-                          {user.display_name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{user.display_name}</p>
-                        <p className="text-xs text-slate-500 truncate">{user.bio || 'No bio'}</p>
-                      </div>
-                      <button onClick={() => toggleFollow(user.id)}
-                        className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-all ${
-                          following.has(user.id) ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}>
-                        {following.has(user.id) ? t('onboarding.following') : t('onboarding.follow')}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400 flex items-start gap-2 mt-4">
-              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Navigation */}
-          <div className="flex gap-2 mt-5">
-            {step > 1 && step < 5 && (
-              <button onClick={() => { setStep((step - 1) as Step); setError(null); }}
-                className="flex items-center gap-1 bg-slate-800 text-slate-300 hover:text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors">
-                <ChevronLeft size={16} /> {t('onboarding.back')}
-              </button>
-            )}
-            {step < 3 && (
-              <button onClick={() => {
-                if (step === 1) handleStep1Next();
-                else if (step === 2) handleStep2Next();
-              }} className="flex-1 flex items-center justify-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20">
-                {t('onboarding.continue')} <ChevronRight size={16} />
-              </button>
-            )}
-            {step === 4 && (
-              <button onClick={() => setStep(5)}
-                className="flex-1 flex items-center justify-center gap-1 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20">
-                {t('onboarding.continue')} <ChevronRight size={16} />
-              </button>
-            )}
-            {step === 5 && (
-              <button onClick={handleComplete} disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20">
-                {loading ? <><Loader2 size={18} className="animate-spin" /> {t('onboarding.finishing')}</> : <><Check size={18} /> {t('onboarding.enterFlip')}</>}
-              </button>
-            )}
-            {step === 5 && (
-              <button onClick={handleComplete} disabled={loading}
-                className="bg-slate-800 text-slate-400 hover:text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors">
-                {t('onboarding.skip')}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Full terms page modal */}
-      {showTermsPage && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setShowTermsPage(false)}>
-          <div className="bg-slate-900 rounded-3xl border border-white/10 p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold flex items-center gap-2"><Shield size={18} className="text-emerald-400" /> FLIP Terms of Service</h2>
-              <button onClick={() => setShowTermsPage(false)}><X size={20} /></button>
-            </div>
-            <div className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">{TERMS_TEXT}</div>
-            <button onClick={() => { setAgreedToTerms(true); setShowTermsPage(false); }}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-semibold py-3 rounded-xl mt-4 transition-colors">
-              {t('onboarding.agreeTermsBtn')}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                    className="px-
